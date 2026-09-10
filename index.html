@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Journal de poids & TDEE adaptatif</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#14181C;
+    --panel:#1B2025;
+    --panel-alt:#20262C;
+    --border:#2A3037;
+    --border-soft:#242A30;
+    --text:#E8EAED;
+    --text-dim:#8B95A1;
+    --text-faint:#5C6570;
+    --teal:#4FD1C5;
+    --teal-dim:rgba(79,209,197,0.18);
+    --amber:#E8A33D;
+    --amber-dim:rgba(232,163,61,0.18);
+    --rose:#C2607A;
+    --blue:#5B8DEF;
+    --green:#6FCF97;
+    --red:#E0806C;
+    --font-ui:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-mono:'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace;
+    --radius:5px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-ui);
+    -webkit-font-smoothing:antialiased;
+    padding:0 0 64px 0;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:28px 18px 0;}
+  header{margin-bottom:22px;}
+  header h1{
+    font-size:1.5rem;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    margin:0 0 6px 0;
+    line-height:1.25;
+  }
+  header .subtitle{
+    color:var(--text-dim);
+    font-size:0.92rem;
+    margin:0;
+    max-width:60ch;
+    line-height:1.5;
+  }
+  .stats-strip{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    overflow:hidden;
+    margin-bottom:22px;
+    background:var(--panel);
+  }
+  .stat{
+    padding:14px 14px;
+    border-right:1px solid var(--border);
+  }
+  .stat:last-child{border-right:none;}
+  .stat .val{
+    font-family:var(--font-mono);
+    font-size:1.35rem;
+    font-weight:600;
+    color:var(--text);
+    line-height:1.1;
+  }
+  .stat .val.teal{color:var(--teal);}
+  .stat .val.amber{color:var(--amber);}
+  .stat .unit{font-size:0.7rem;color:var(--text-faint);font-weight:400;margin-left:3px;}
+  .stat .label{
+    font-size:0.74rem;
+    color:var(--text-dim);
+    margin-top:4px;
+  }
+  .stat .sub{font-size:0.68rem;color:var(--text-faint);margin-top:2px;}
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:18px;
+    margin-bottom:16px;
+  }
+  .panel h2{
+    font-size:0.98rem;
+    font-weight:600;
+    margin:0 0 14px 0;
+    color:var(--text);
+  }
+  .panel h2 .hint{
+    font-weight:400;
+    color:var(--text-faint);
+    font-size:0.78rem;
+    margin-left:8px;
+  }
+  form#entryForm{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+  }
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:0.72rem;color:var(--text-dim);}
+  .field input{
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    border-radius:4px;
+    color:var(--text);
+    font-family:var(--font-mono);
+    font-size:0.88rem;
+    padding:8px 9px;
+    width:100%;
+  }
+  .field input:focus{outline:none;border-color:var(--teal);}
+  .field.wide{grid-column:span 2;}
+  .form-actions{
+    grid-column:1/-1;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    margin-top:4px;
+  }
+  button{
+    font-family:var(--font-ui);
+    font-size:0.85rem;
+    font-weight:500;
+    border-radius:4px;
+    border:1px solid var(--border);
+    background:var(--panel-alt);
+    color:var(--text);
+    padding:9px 16px;
+    cursor:pointer;
+  }
+  button:hover{border-color:var(--text-faint);}
+  button.primary{background:var(--teal);border-color:var(--teal);color:#0C1416;font-weight:600;}
+  button.primary:hover{opacity:0.9;}
+  button.danger{color:var(--red);}
+  button.ghost{background:transparent;}
+  #cancelEditBtn{display:none;}
+  .chart-box{position:relative;height:260px;}
+  .chart-box.small{height:190px;}
+  details summary{cursor:pointer;color:var(--text-dim);font-size:0.88rem;}
+  details[open] summary{color:var(--text);margin-bottom:10px;}
+  .method-body{font-size:0.87rem;color:var(--text-dim);line-height:1.65;}
+  .method-body code{font-family:var(--font-mono);color:var(--teal);background:var(--teal-dim);padding:1px 5px;border-radius:3px;font-size:0.82em;}
+  .settings-row{display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;}
+  .settings-row .field{max-width:140px;}
+  .table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+  .table-header h2{margin:0;}
+  .table-actions{display:flex;gap:8px;}
+  .table-wrap{overflow-x:auto;border:1px solid var(--border-soft);border-radius:4px;}
+  table{border-collapse:collapse;width:100%;min-width:920px;font-family:var(--font-mono);font-size:0.78rem;}
+  thead th{
+    text-align:right;
+    padding:9px 10px;
+    color:var(--text-dim);
+    font-weight:500;
+    background:var(--panel-alt);
+    border-bottom:1px solid var(--border);
+    white-space:nowrap;
+    font-family:var(--font-ui);
+    font-size:0.72rem;
+  }
+  thead th:first-child,tbody td:first-child{text-align:left;}
+  tbody td{
+    text-align:right;
+    padding:8px 10px;
+    border-bottom:1px solid var(--border-soft);
+    white-space:nowrap;
+    color:var(--text);
+  }
+  tbody tr:hover{background:var(--panel-alt);}
+  tbody td.dim{color:var(--text-faint);}
+  tbody td.teal{color:var(--teal);}
+  tbody td.amber{color:var(--amber);}
+  tbody td.actions{text-align:center;}
+  tbody td.actions button{padding:4px 8px;font-size:0.72rem;margin:0 2px;}
+  .empty-note{color:var(--text-faint);font-size:0.82rem;padding:6px 2px;}
+  footer.storage-note{color:var(--text-faint);font-size:0.74rem;text-align:center;margin-top:18px;}
+  @media (max-width:640px){
+    .stats-strip{grid-template-columns:repeat(2,1fr);}
+    .stat:nth-child(2){border-right:none;}
+    .stat{border-bottom:1px solid var(--border);}
+    .stat:nth-child(3),.stat:nth-child(4){border-bottom:none;}
+    form#entryForm{grid-template-columns:repeat(2,1fr);}
+    .field.wide{grid-column:span 2;}
+    table{min-width:760px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Journal de poids & dépense énergétique</h1>
+    <p class="subtitle">Chaque entrée recalcule le poids de tendance, les moyennes glissantes et une estimation adaptative du TDEE.</p>
+  </header>
+
+  <section class="stats-strip" id="statsStrip"></section>
+
+  <section class="panel">
+    <h2 id="formTitle">Ajouter une journée</h2>
+    <form id="entryForm">
+      <div class="field"><label for="f_date">Date</label><input type="date" id="f_date" required></div>
+      <div class="field"><label for="f_wm">Poids matin (kg)</label><input type="number" step="0.1" id="f_wm" placeholder="—"></div>
+      <div class="field"><label for="f_ws">Poids soir (kg)</label><input type="number" step="0.1" id="f_ws" placeholder="—"></div>
+      <div class="field"><label for="f_steps">Pas</label><input type="number" step="1" id="f_steps" placeholder="—"></div>
+      <div class="field"><label for="f_cals">Calories (kcal)</label><input type="number" step="1" id="f_cals" placeholder="—"></div>
+      <div class="field"><label for="f_prot">Protéines (g)</label><input type="number" step="1" id="f_prot" placeholder="—"></div>
+      <div class="field"><label for="f_carbs">Glucides (g)</label><input type="number" step="1" id="f_carbs" placeholder="—"></div>
+      <div class="field"><label for="f_fat">Lipides (g)</label><input type="number" step="1" id="f_fat" placeholder="—"></div>
+      <div class="form-actions">
+        <button type="submit" class="primary" id="submitBtn">Enregistrer le jour</button>
+        <button type="button" id="cancelEditBtn" class="ghost">Annuler la modification</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Poids et tendance</h2>
+    <div class="chart-box"><canvas id="chartWeight"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <h2>Calories & TDEE estimé</h2>
+    <div class="chart-box"><canvas id="chartTdee"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <h2>Rythme hebdomadaire<span class="hint">variation du poids de tendance sur 7 jours</span></h2>
+    <div class="chart-box small"><canvas id="chartRate"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <h2>Pas</h2>
+    <div class="chart-box small"><canvas id="chartSteps"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <h2>Répartition des macros</h2>
+    <div class="chart-box"><canvas id="chartMacros"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>Comment ce sont calculés le poids de tendance et le TDEE</summary>
+      <div class="method-body">
+        <p><strong>Poids retenu</strong> — moyenne du poids du matin et du soir si les deux sont saisis, sinon la valeur disponible.</p>
+        <p><strong>Lissage 7j</strong> — moyenne glissante sur les <code>N</code> derniers jours (poids, calories, pas), pour effacer le bruit quotidien (eau, digestion, glycogène) et ne garder que la tendance de fond.</p>
+        <p><strong>TDEE estimé</strong> — bilan énergétique : <code>TDEE = Calories lissées − (Δ Poids de tendance sur 7j × kcal/kg ÷ 7)</code>. Si le poids de tendance a baissé sur la semaine, le corps a brûlé plus que ce qui a été mangé : le TDEE est donc supérieur aux calories consommées, et inversement en cas de prise de poids. Le résultat est ensuite lui-même lissé pour éviter les à-coups.</p>
+      </div>
+      <div class="settings-row">
+        <div class="field">
+          <label for="s_kcal">kcal par kg</label>
+          <input type="number" step="50" id="s_kcal">
+        </div>
+        <div class="field">
+          <label for="s_window">Fenêtre de lissage (jours)</label>
+          <input type="number" step="1" min="3" max="14" id="s_window">
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section class="panel">
+    <div class="table-header">
+      <h2>Journal complet</h2>
+      <div class="table-actions">
+        <button id="exportBtn">Exporter en CSV</button>
+        <button id="resetBtn" class="danger">Réinitialiser</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th>Date</th><th>Matin</th><th>Soir</th><th>Retenu</th>
+            <th>Kcal</th><th>Prot.</th><th>Gluc.</th><th>Lip.</th><th>Pas</th>
+            <th>Tend. 7j</th><th>Kcal 7j</th><th>Pas 7j</th><th>TDEE</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="dataTableBody"></tbody>
+      </table>
+    </div>
+    <p class="empty-note" id="emptyNote" style="display:none;">Aucune donnée pour l'instant — ajoutez votre première journée ci-dessus.</p>
+  </section>
+
+  <footer class="storage-note" id="storageNote">Chargement des données…</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const STORAGE_KEY = 'entries_v2';
+  const SETTINGS_KEY = 'settings_v2';
+  let entries = [];
+  let settings = { kcalPerKg: 7700, window: 7 };
+  let editingDate = null;
+  let persistenceOk = true;
+  let charts = {};
+
+  // Données de test (7 jours) pour démontrer le fonctionnement immédiat des graphiques
+  const SEED = [
+    { date:'2026-09-04', wm:82.1, ws:null, cals:2400, prot:160, carbs:220, fat:80, steps:8500 },
+    { date:'2026-09-05', wm:81.9, ws:null, cals:2550, prot:160, carbs:250, fat:85, steps:11000 },
+    { date:'2026-09-06', wm:82.0, ws:null, cals:2600, prot:165, carbs:260, fat:90, steps:9000 },
+    { date:'2026-09-07', wm:81.7, ws:null, cals:2450, prot:160, carbs:230, fat:85, steps:10500 },
+    { date:'2026-09-08', wm:81.5, ws:null, cals:2500, prot:160, carbs:240, fat:85, steps:9500 },
+    { date:'2026-09-09', wm:81.4, ws:null, cals:2500, prot:160, carbs:240, fat:85, steps:10000 },
+    { date:'2026-09-10', wm:81.2, ws:null, cals:2400, prot:160, carbs:230, fat:80, steps:12000 }
+  ];
+
+  // ---------- storage (CORRIGÉ) ----------
+  function loadAll(){
+    try{
+      const r = localStorage.getItem(STORAGE_KEY);
+      entries = r ? JSON.parse(r) : SEED.slice();
+    }catch(e){
+      entries = SEED.slice();
+      persistenceOk=false;
+    }
+    try{
+      const r = localStorage.getItem(SETTINGS_KEY);
+      if(r) settings = Object.assign(settings, JSON.parse(r));
+    }catch(e){
+      persistenceOk=false;
+    }
+  }
+  function saveEntries(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
+    catch(e){ persistenceOk=false; renderStorageNote(); }
+  }
+  function saveSettings(){
+    try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+    catch(e){ persistenceOk=false; renderStorageNote(); }
+  }
+  function renderStorageNote(){
+    document.getElementById('storageNote').textContent = persistenceOk
+      ? 'Vos données sont sauvegardées automatiquement sur cet appareil.'
+      : 'Erreur de sauvegarde locale - vérifiez les permissions de votre navigateur.';
+  }
+
+  // ---------- helpers ----------
+  function fmt(n, d){
+    if(n===null || n===undefined || isNaN(n)) return '—';
+    return n.toFixed(d===undefined?0:d).replace('.', ',');
+  }
+  function displayDate(iso){
+    const [y,m,d] = iso.split('-');
+    return `${d}/${m}/${y.slice(2)}`;
+  }
+  function poidsRetenu(e){
+    if(e.wm!=null && e.ws!=null) return (e.wm+e.ws)/2;
+    if(e.wm!=null) return e.wm;
+    if(e.ws!=null) return e.ws;
+    return null;
+  }
+  function rollingAvg(arr, idx, window, key){
+    if(idx < window-1) return null;
+    const vals=[];
+    for(let j=idx-window+1;j<=idx;j++){
+      const v = arr[j][key];
+      if(v!=null) vals.push(v);
+    }
+    if(vals.length===0) return null;
+    return vals.reduce((a,b)=>a+b,0)/vals.length;
+  }
+
+  function computeDerived(){
+    const sorted = entries.slice().sort((a,b)=> a.date.localeCompare(b.date));
+    const d = sorted.map(e => ({ ...e, pr: poidsRetenu(e) }));
+    const w = settings.window;
+    d.forEach((row,i)=>{
+      row.lp = rollingAvg(d, i, w, 'pr');
+      row.lc = rollingAvg(d, i, w, 'cals');
+      row.ls = rollingAvg(d, i, w, 'steps');
+    });
+    d.forEach((row,i)=>{
+      const prev = d[i-w];
+      if(row.lp!=null && prev && prev.lp!=null){
+        row.weeklyRateKg = row.lp - prev.lp;
+        if(row.lc!=null){
+          row.tdee = row.lc - (row.weeklyRateKg * settings.kcalPerKg / w);
+        } else row.tdee = null;
+      } else {
+        row.weeklyRateKg = null;
+        row.tdee = null;
+      }
+    });
+    let prevSm = null;
+    d.forEach(row=>{
+      if(row.tdee!=null){
+        prevSm = (prevSm===null) ? row.tdee : prevSm + 0.25*(row.tdee - prevSm);
+        row.tdeeSm = prevSm;
+      } else row.tdeeSm = null;
+    });
+    return d;
+  }
+
+  // ---------- rendering ----------
+  function lastValid(arr, key){
+    for(let i=arr.length-1;i>=0;i--) if(arr[i][key]!=null) return arr[i];
+    return null;
+  }
+
+  function renderStats(d){
+    const strip = document.getElementById('statsStrip');
+    const lastW = lastValid(d,'pr');
+    const lastTrend = lastValid(d,'lp');
+    const lastTdee = lastValid(d,'tdeeSm');
+    const lastRate = lastValid(d,'weeklyRateKg');
+    strip.innerHTML = `
+      <div class="stat">
+        <div class="val teal">${lastW?fmt(lastW.pr,1):'—'}<span class="unit">kg</span></div>
+        <div class="label">Dernier poids retenu</div>
+        <div class="sub">${lastW?displayDate(lastW.date):'aucune donnée'}</div>
+      </div>
+      <div class="stat">
+        <div class="val teal">${lastTrend?fmt(lastTrend.lp,1):'—'}<span class="unit">kg</span></div>
+        <div class="label">Poids de tendance</div>
+        <div class="sub">${lastTrend?`moy. ${settings.window}j`:`besoin de ${settings.window} jours`}</div>
+      </div>
+      <div class="stat">
+        <div class="val amber">${lastTdee?fmt(lastTdee.tdeeSm,0):'—'}<span class="unit">kcal</span></div>
+        <div class="label">TDEE estimé (lissé)</div>
+        <div class="sub">${lastTdee?displayDate(lastTdee.date):`besoin de ${settings.window*2} jours`}</div>
+      </div>
+      <div class="stat">
+        <div class="val">${lastRate? (lastRate.weeklyRateKg>0?'+':'') + fmt(lastRate.weeklyRateKg,2):'—'}<span class="unit">kg/sem</span></div>
+        <div class="label">Rythme hebdomadaire</div>
+        <div class="sub">${lastRate?displayDate(lastRate.date):`besoin de ${settings.window+1} jours`}</div>
+      </div>`;
+  }
+
+  function renderTable(d){
+    const body = document.getElementById('dataTableBody');
+    const rev = d.slice().reverse();
+    document.getElementById('emptyNote').style.display = rev.length ? 'none' : 'block';
+    body.innerHTML = rev.map(row=>`
+      <tr>
+        <td>${displayDate(row.date)}</td>
+        <td class="dim">${fmt(row.wm,1)}</td>
+        <td class="dim">${fmt(row.ws,1)}</td>
+        <td>${fmt(row.pr,1)}</td>
+        <td class="dim">${fmt(row.cals,0)}</td>
+        <td class="dim">${fmt(row.prot,0)}</td>
+        <td class="dim">${fmt(row.carbs,0)}</td>
+        <td class="dim">${fmt(row.fat,0)}</td>
+        <td class="dim">${fmt(row.steps,0)}</td>
+        <td class="teal">${fmt(row.lp,1)}</td>
+        <td class="dim">${fmt(row.lc,0)}</td>
+        <td class="dim">${fmt(row.ls,0)}</td>
+        <td class="amber">${fmt(row.tdeeSm,0)}</td>
+        <td class="actions">
+          <button data-edit="${row.date}">Modifier</button>
+          <button data-del="${row.date}" class="danger">Suppr.</button>
+        </td>
+      </tr>`).join('');
+    body.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>startEdit(b.getAttribute('data-edit'))));
+    body.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>deleteEntry(b.getAttribute('data-del'))));
+  }
+
+  function baseChartOpts(extra){
+    return Object.assign({
+      responsive:true,
+      maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      animation: { duration: 400 },
+      plugins:{
+        legend:{ labels:{ color:'#8B95A1', boxWidth:12, font:{ family:'Inter', size:11 } } },
+        tooltip:{ backgroundColor:'#1B2025', borderColor:'#2A3037', borderWidth:1, titleColor:'#E8EAED', bodyColor:'#E8EAED' }
+      },
+      scales:{
+        x:{ ticks:{ color:'#5C6570', font:{ family:'IBM Plex Mono', size:10 }, maxRotation:0, autoSkip:true }, grid:{ color:'#20262C' } },
+        y:{ ticks:{ color:'#5C6570', font:{ family:'IBM Plex Mono', size:10 } }, grid:{ color:'#20262C' } }
+      }
+    }, extra||{});
+  }
+
+  function upsertChart(key, canvasId, config){
+    if(charts[key]) charts[key].destroy();
+    charts[key] = new Chart(document.getElementById(canvasId).getContext('2d'), config);
+  }
+
+  function renderCharts(d){
+    if(typeof Chart === 'undefined') return;
+    const labels = d.map(r=>displayDate(r.date));
+
+    upsertChart('weight','chartWeight',{
+      type:'line',
+      data:{ labels, datasets:[
+        { label:'Poids retenu', data:d.map(r=>r.pr), borderColor:'rgba(139,149,161,0.55)', backgroundColor:'transparent', pointRadius:2, pointBackgroundColor:'rgba(139,149,161,0.7)', borderWidth:1, spanGaps:true, tension:0.15 },
+        { label:`Tendance (${settings.window}j)`, data:d.map(r=>r.lp), borderColor:'#4FD1C5', backgroundColor:'transparent', pointRadius:0, borderWidth:2.5, spanGaps:true, tension:0.25 }
+      ]},
+      options: baseChartOpts()
+    });
+
+    upsertChart('tdee','chartTdee',{
+      type:'line',
+      data:{ labels, datasets:[
+        { label:'Calories brutes', data:d.map(r=>r.cals), borderColor:'transparent', backgroundColor:'rgba(139,149,161,0.18)', type:'bar', order:3 },
+        { label:`Calories (moy. ${settings.window}j)`, data:d.map(r=>r.lc), borderColor:'rgba(139,149,161,0.8)', backgroundColor:'transparent', borderDash:[4,3], pointRadius:0, borderWidth:1.5, spanGaps:true, order:2 },
+        { label:'TDEE estimé (lissé)', data:d.map(r=>r.tdeeSm), borderColor:'#E8A33D', backgroundColor:'transparent', pointRadius:0, borderWidth:2.5, spanGaps:true, tension:0.25, order:1 }
+      ]},
+      options: baseChartOpts()
+    });
+
+    upsertChart('rate','chartRate',{
+      type:'bar',
+      data:{ labels, datasets:[
+        { label:'kg/semaine', data:d.map(r=>r.weeklyRateKg), backgroundColor:d.map(r=> r.weeklyRateKg==null?'transparent': (r.weeklyRateKg>0?'rgba(194,96,122,0.75)':'rgba(79,209,197,0.75)')) }
+      ]},
+      options: baseChartOpts({ plugins:{ legend:{ display:false } } })
+    });
+
+    upsertChart('steps','chartSteps',{
+      type:'bar',
+      data:{ labels, datasets:[
+        { label:'Pas', data:d.map(r=>r.steps), backgroundColor:'rgba(91,141,239,0.28)', order:2 },
+        { label:`Moy. ${settings.window}j`, data:d.map(r=>r.ls), type:'line', borderColor:'#5B8DEF', backgroundColor:'transparent', pointRadius:0, borderWidth:2.5, spanGaps:true, order:1 }
+      ]},
+      options: baseChartOpts()
+    });
+
+    upsertChart('macros','chartMacros',{
+      type:'bar',
+      data:{ labels, datasets:[
+        { label:'Protéines', data:d.map(r=>r.prot), backgroundColor:'#5B8DEF' },
+        { label:'Glucides', data:d.map(r=>r.carbs), backgroundColor:'#E8A33D' },
+        { label:'Lipides', data:d.map(r=>r.fat), backgroundColor:'#C2607A' }
+      ]},
+      options: baseChartOpts({ scales:{
+        x:{ stacked:true, ticks:{ color:'#5C6570', font:{ family:'IBM Plex Mono', size:10 }, maxRotation:0, autoSkip:true }, grid:{ color:'#20262C' } },
+        y:{ stacked:true, ticks:{ color:'#5C6570', font:{ family:'IBM Plex Mono', size:10 } }, grid:{ color:'#20262C' } }
+      }})
+    });
+  }
+
+  function renderSettingsFields(){
+    document.getElementById('s_kcal').value = settings.kcalPerKg;
+    document.getElementById('s_window').value = settings.window;
+  }
+
+  function render(){
+    const d = computeDerived();
+    renderStats(d);
+    renderTable(d);
+    renderCharts(d);
+  }
+
+  // ---------- form ----------
+  function readForm(){
+    return {
+      date: document.getElementById('f_date').value,
+      wm: parseNum('f_wm'), ws: parseNum('f_ws'),
+      cals: parseNum('f_cals'), prot: parseNum('f_prot'),
+      carbs: parseNum('f_carbs'), fat: parseNum('f_fat'),
+      steps: parseNum('f_steps')
+    };
+  }
+  function parseNum(id){
+    let v = document.getElementById(id).value;
+    if(v==='') return null;
+    v = v.replace(',', '.'); // Correction pour permettre les virgules françaises
+    return parseFloat(v);
+  }
+  function fillForm(e){
+    document.getElementById('f_date').value = e.date;
+    document.getElementById('f_wm').value = e.wm ?? '';
+    document.getElementById('f_ws').value = e.ws ?? '';
+    document.getElementById('f_cals').value = e.cals ?? '';
+    document.getElementById('f_prot').value = e.prot ?? '';
+    document.getElementById('f_carbs').value = e.carbs ?? '';
+    document.getElementById('f_fat').value = e.fat ?? '';
+    document.getElementById('f_steps').value = e.steps ?? '';
+  }
+  function clearForm(){
+    document.getElementById('entryForm').reset();
+    document.getElementById('f_date').value = todayISO();
+  }
+  function todayISO(){
+    const t = new Date();
+    return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  }
+  function startEdit(date){
+    const e = entries.find(x=>x.date===date);
+    if(!e) return;
+    editingDate = date;
+    fillForm(e);
+    document.getElementById('formTitle').textContent = `Modifier le ${displayDate(date)}`;
+    document.getElementById('submitBtn').textContent = 'Mettre à jour';
+    document.getElementById('cancelEditBtn').style.display = 'inline-block';
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  function stopEdit(){
+    editingDate = null;
+    document.getElementById('formTitle').textContent = 'Ajouter une journée';
+    document.getElementById('submitBtn').textContent = 'Enregistrer le jour';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    clearForm();
+  }
+  function deleteEntry(date){
+    if(!confirm(`Supprimer l'entrée du ${displayDate(date)} ?`)) return;
+    entries = entries.filter(e=>e.date!==date);
+    saveEntries();
+    render();
+  }
+
+  document.getElementById('entryForm').addEventListener('submit', (ev)=>{
+    ev.preventDefault();
+    const data = readForm();
+    if(!data.date) return;
+    const idx = entries.findIndex(e=>e.date===data.date);
+    if(idx>=0) entries[idx] = data; else entries.push(data);
+    if(editingDate && editingDate!==data.date){
+      entries = entries.filter(e=>e.date!==editingDate);
+    }
+    saveEntries();
+    stopEdit();
+    render();
+  });
+  document.getElementById('cancelEditBtn').addEventListener('click', stopEdit);
+
+  document.getElementById('s_kcal').addEventListener('change', (ev)=>{
+    const v = parseFloat(ev.target.value);
+    if(!isNaN(v) && v>0){ settings.kcalPerKg = v; saveSettings(); render(); }
+  });
+  document.getElementById('s_window').addEventListener('change', (ev)=>{
+    const v = parseInt(ev.target.value,10);
+    if(!isNaN(v) && v>=3 && v<=14){ settings.window = v; saveSettings(); render(); }
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    if(!confirm('Supprimer toutes les données enregistrées ? Cette action est irréversible.')) return;
+    entries = [];
+    saveEntries();
+    render();
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const d = computeDerived();
+    const header = ['Date','Poids Matin (kg)','Poids Soir (kg)','Poids Retenu','Calories (kcal)','Proteines (g)','Glucides (g)','Lipides (g)','Pas','Lissage Poids 7j','Lissage Cals 7j','Lissage Pas 7j','TDEE Calcule'];
+    const rows = d.map(r=>[
+      displayFullDate(r.date), r.wm??'', r.ws??'', r.pr!=null?r.pr.toFixed(1):'', r.cals??'', r.prot??'', r.carbs??'', r.fat??'', r.steps??'',
+      r.lp!=null?r.lp.toFixed(1):'', r.lc!=null?r.lc.toFixed(0):'', r.ls!=null?r.ls.toFixed(0):'', r.tdeeSm!=null?r.tdeeSm.toFixed(0):''
+    ]);
+    const csv = [header.join(';')].concat(rows.map(r=>r.join(';'))).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'journal_tdee.csv';
+    a.click();
+  });
+  function displayFullDate(iso){
+    const [y,m,dd] = iso.split('-');
+    return `${dd}/${m}/${y}`;
+  }
+
+  // ---------- init ----------
+  (function init(){
+    document.getElementById('f_date').value = todayISO();
+    loadAll();
+    renderSettingsFields();
+    renderStorageNote();
+    render();
+  })();
+})();
+</script>
+</body>
+</html>
